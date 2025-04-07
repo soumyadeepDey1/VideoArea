@@ -1,0 +1,15 @@
+{
+  "name": "dsta-modeling-practice",
+  "version": "1.0.0",
+  "description": "It is a profesional approch of data modeling of a project",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "soumya",
+    "chaiaurcode"
+  ],
+  "author": "Soumyadeep Dey",
+  "license": "ISC"
+}
