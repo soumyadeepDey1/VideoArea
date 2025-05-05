@@ -257,27 +257,81 @@ const getCurrentUser = asyncHandler(async (req, res) => {
 });
 
 const updateAccountDetails = asyncHandler(async (req, res) => {
-  const {fullName, email} = req.body;
+  const { fullName, email } = req.body;
   if (!fullName || !email) {
     throw new ApiError("All field is required", 400);
   }
 
-  User.findByIdAndUpdate( 
+  User.findByIdAndUpdate(
     req.user?._id,
     {
-      $set:{
+      $set: {
         fullName,
-        email
-      }
+        email,
+      },
     },
     {
       new: true,
     }
-  ).select("-password")
+  ).select("-password");
 
   return res
     .status(200)
     .json(new ApiResponse("User details updated successfully", {}, 200));
+});
+
+const updateUserAvatar = asyncHandler(async (req, res) => {
+  const avatarLocalPath = req.file?.path;
+  if (!avatarLocalPath) {
+    throw new ApiError("Avatar is missing", 400);
+  }
+  const avatar = await uploadOnCloudinary(avatarLocalPath);
+  if (!avatar.url) {
+    throw new ApiError("Error while uploading on avatar", 400);
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    {
+      $set: {
+        avatar: avatar.url,
+      },
+    },
+    {
+      new: true,
+    }
+  ).select("-password");
+
+  return res
+    .status(200)
+    .json(new ApiResponse("User avatar updated successfully", user, 200));
+});
+
+const updateUserCover = asyncHandler(async (req, res) => {
+  const coverLocalPath = req.file?.path;
+  if (!coverLocalPath) {
+    throw new ApiError("cover is missing", 400);
+  }
+  const avatar = await uploadOnCloudinary(coverLocalPath);
+  if (!cover.url) {
+    throw new ApiError("Error while uploading on cover", 400);
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    {
+      $set: {
+        avatar: cover.url,
+      },
+    },
+    {
+      new: true,
+    }
+  ).select("-password");
+
+  return res
+    .status(200)
+    .json(new ApiResponse("User cover updated successfully", user, 200));
 });
 
 export {
@@ -285,7 +339,9 @@ export {
   loginUser,
   logoutUser,
   refreshAccessToken,
-  changeCurrentPassword, 
+  changeCurrentPassword,
   getCurrentUser,
-  updateAccountDetails
+  updateAccountDetails,
+  updateUserAvatar,
+  updateUserCover,
 };
