@@ -10,11 +10,11 @@ import {
   updateUserCover,
   getUserChanelProfile,
   getWatchHistory,
-} from "../controllers/user.controllers.js";
+} from "../controllers/user.controller.js";
 const router = Router();
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
-import { refreshAccessToken } from "../controllers/user.controllers.js";
+import { refreshAccessToken } from "../controllers/user.controller.js";
 router.route("/register").post(
   upload.fields([
     {
