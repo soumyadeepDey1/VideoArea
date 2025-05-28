@@ -32,44 +32,109 @@ const getAllVideos = asyncHandler(async (req, res) => {
   }
 
   const sortOptions = {};
-    sortOptions[sortBy] = sortType === "asc" ? 1 : -1;
-  
-    const  totalVideos = await Video.countDocuments(searchFilter);
+  sortOptions[sortBy] = sortType === "asc" ? 1 : -1;
+
+  const totalVideos = await Video.countDocuments(searchFilter);
   if (totalVideos === 0) {
-    throw new ApiError(404, "No videos found for the given query"); 
+    throw new ApiError(404, "No videos found for the given query");
   }
 
-  const videos= await
-    Video.find(searchFilter)
+  const videos = await Video.find(searchFilter)
     .sort(sortOptions)
     .skip((pageNumber - 1) * pageSize)
     .limit(pageSize);
 
-    const totalPages = Math.ceil(totalVideos / pageSize);
-    res.status(200).json(
-        new ApiResponse({
-            success: true,
-            message: "Videos fetched successfully",
-            data:videos,
-            pagination: {
-                totalVideos,
-                totalPages,
-                page: pageNumber,
-                page:pageSize,
-            },
-        })
-    )
-
+  const totalPages = Math.ceil(totalVideos / pageSize);
+  res.status(200).json(
+    new ApiResponse({
+      success: true,
+      message: "Videos fetched successfully",
+      data: videos,
+      pagination: {
+        totalVideos,
+        totalPages,
+        page: pageNumber,
+        page: pageSize,
+      },
+    })
+  );
 });
 
 const publishAVideo = asyncHandler(async (req, res) => {
   const { title, description } = req.body;
   // TODO: get video, upload to cloudinary, create video
+  if (!title || !description || !req.files || !req.file.video) {
+    throw new ApiError(
+      400,
+      "Title and description and requested file are required"
+    );
+  }
+  const videoFile = req.files.video;
+
+  if (!videoFile || !videoFile.mimetype.startsWith("video/")) {
+    throw new ApiError(400, "Please upload a valid video file");
+  }
+
+  try {
+    const uploadResonse = await uploadOnCloudinary(videoFile.path, "videos");
+    if (!uploadResonse || !uploadResonse.secure_url) {
+      throw new ApiError(500, "Failed to upload video to cloudinary");
+    }
+    const videoUrl = uploadResonse.secure_url;
+    const thumbnailUrl = uploadResonse.thumbnail_url || "";
+
+    const newVideo = await Video.create({
+      title,
+      description,
+      videoUrl,
+      thumbnailUrl,
+      userId: req.user._id, // Assuming req.user is set by the auth middleware
+      publishStatus: true,
+    });
+
+    if (!newVideo) {
+      throw new ApiError(500, "Failed to create video");
+    }
+
+    res.status(201).json(
+      new ApiResponse({
+        success: true,
+        message: "Video published successfully",
+        data: newVideo,
+      })
+    );
+  } catch (error) {
+    throw new ApiError(
+      500,
+      "An error occurred while publishing the video: " + error
+    );
+  }
 });
 
 const getVideoById = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
   //TODO: get video by id
+  if (!isValidObjectId(videoId)) {
+    throw new ApiError(400, "Invalid video ID");
+  }
+  const video = await Video.findById(videoId)
+  
+  if (!video) {
+    throw new ApiError(404, "Video not found"); 
+    
+  }
+
+  if (req.user._id.toString() !== video.userId.toString()) {
+    throw new ApiError(403, "You are not authorized to view this video");
+    
+  }
+  res.status(200).json(
+    new ApiResponse({
+      success: true,
+      message: "Video fetched successfully",
+      data: video,
+    })
+  );
 });
 
 const updateVideo = asyncHandler(async (req, res) => {
