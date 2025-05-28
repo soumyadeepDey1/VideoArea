@@ -140,15 +140,89 @@ const getVideoById = asyncHandler(async (req, res) => {
 const updateVideo = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
   //TODO: update video details like title, description, thumbnail
+  if (!isValidObjectId(videoId)) {
+    throw new ApiError(400, "Invalid video ID");
+  }
+  const video = await Video.findById(videoId);
+  if (!video) {
+    throw new ApiError(404, "Video not found");
+  }
+  if (video.userId.toString() !== req.user._id.toString()) {
+    throw new ApiError(403, "You are not authorized to update this video");
+  }
+  const { title, description , thumbnail } = req.body;
+  if (title) {
+    video.title = title;
+    
+  }
+  if (description) {
+    video.description = description;
+    
+  }
+  if (thumbnail) {
+    video.thumbnailUrl = thumbnail;
+    
+  }
+  const updatedVideo = await video.save();
+  res.status(200).json(
+    new ApiResponse({
+      success: true,
+      message: "Video updated successfully",
+      data: updatedVideo,
+    })
+  );
 });
 
 const deleteVideo = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
   //TODO: delete video
+  if (!isValidObjectId(videoId)) {
+    throw new ApiError(400, "Invalid video ID");
+  }
+  const video = await Video.findById(videoId);
+  if (!video) {
+    throw new ApiError(404, "Video not found");
+  }
+  if (video.userId.toString() !== req.user._id.toString()) {
+    throw new ApiError(403, "You are not authorized to delete this video");
+  }
+  try {
+    await uploadOnCloudinary.deleteResource(video.cloudinaryPublicId);
+    await video.remove();
+    res.status(200).json(
+      new ApiResponse({
+        success: true,
+        message: "Video deleted successfully",
+      })
+    );
+  } catch (error) {
+    throw new ApiError(500, "An error occurred while deleting the video: " + error);
+  }
+
 });
 
 const togglePublishStatus = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
+  //TODO: toggle publish status of a video
+  if (!isValidObjectId(videoId)) {
+    throw new ApiError(400, "Invalid video ID");
+  }
+  const video = await Video.findById(videoId);
+  if (!video) {
+    throw new ApiError(404, "Video not found");
+  }
+  if (video.userId.toString() !== req.user._id.toString()) {
+    throw new ApiError(403, "You are not authorized to toggle publish status of this video");
+  }
+  video.publishStatus = !video.publishStatus;
+  await video.save();
+  res.status(200).json(
+    new ApiResponse({
+      success: true,
+      message: `Video ${video.publishStatus ? "published" : "unpublished"} successfully`,
+      data: video,
+    })
+  );
 });
 
 export {
