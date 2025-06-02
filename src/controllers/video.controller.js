@@ -45,7 +45,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
     .limit(pageSize);
 
   const totalPages = Math.ceil(totalVideos / pageSize);
-  res.status(200).json(
+  return res.status(200).json(
     new ApiResponse({
       success: true,
       message: "Videos fetched successfully",
@@ -96,7 +96,7 @@ const publishAVideo = asyncHandler(async (req, res) => {
       throw new ApiError(500, "Failed to create video");
     }
 
-    res.status(201).json(
+    return res.status(201).json(
       new ApiResponse({
         success: true,
         message: "Video published successfully",
@@ -117,18 +117,16 @@ const getVideoById = asyncHandler(async (req, res) => {
   if (!isValidObjectId(videoId)) {
     throw new ApiError(400, "Invalid video ID");
   }
-  const video = await Video.findById(videoId)
-  
+  const video = await Video.findById(videoId);
+
   if (!video) {
-    throw new ApiError(404, "Video not found"); 
-    
+    throw new ApiError(404, "Video not found");
   }
 
   if (req.user._id.toString() !== video.userId.toString()) {
     throw new ApiError(403, "You are not authorized to view this video");
-    
   }
-  res.status(200).json(
+  return res.status(200).json(
     new ApiResponse({
       success: true,
       message: "Video fetched successfully",
@@ -150,21 +148,18 @@ const updateVideo = asyncHandler(async (req, res) => {
   if (video.userId.toString() !== req.user._id.toString()) {
     throw new ApiError(403, "You are not authorized to update this video");
   }
-  const { title, description , thumbnail } = req.body;
+  const { title, description, thumbnail } = req.body;
   if (title) {
     video.title = title;
-    
   }
   if (description) {
     video.description = description;
-    
   }
   if (thumbnail) {
     video.thumbnailUrl = thumbnail;
-    
   }
   const updatedVideo = await video.save();
-  res.status(200).json(
+  return res.status(200).json(
     new ApiResponse({
       success: true,
       message: "Video updated successfully",
@@ -189,16 +184,18 @@ const deleteVideo = asyncHandler(async (req, res) => {
   try {
     await uploadOnCloudinary.deleteResource(video.cloudinaryPublicId);
     await video.remove();
-    res.status(200).json(
+    return res.status(200).json(
       new ApiResponse({
         success: true,
         message: "Video deleted successfully",
       })
     );
   } catch (error) {
-    throw new ApiError(500, "An error occurred while deleting the video: " + error);
+    throw new ApiError(
+      500,
+      "An error occurred while deleting the video: " + error
+    );
   }
-
 });
 
 const togglePublishStatus = asyncHandler(async (req, res) => {
@@ -212,11 +209,14 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Video not found");
   }
   if (video.userId.toString() !== req.user._id.toString()) {
-    throw new ApiError(403, "You are not authorized to toggle publish status of this video");
+    throw new ApiError(
+      403,
+      "You are not authorized to toggle publish status of this video"
+    );
   }
   video.publishStatus = !video.publishStatus;
   await video.save();
-  res.status(200).json(
+  return res.status(200).json(
     new ApiResponse({
       success: true,
       message: `Video ${video.publishStatus ? "published" : "unpublished"} successfully`,
