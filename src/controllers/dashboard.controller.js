@@ -30,7 +30,7 @@ const getChannelStats = asyncHandler(async (req, res) => {
   });
   const totalTweets = await Tweet.countDocuments({ channel: channelId });
   const totalComments = await Comment.countDocuments({
-    video: { $in: videos.map((v) => v._id) },
+    video: { $in: videos.map(v => v._id) },
   });
 
   const channelStats = {
@@ -43,7 +43,7 @@ const getChannelStats = asyncHandler(async (req, res) => {
   };
   return res
     .status(200)
-    .json(new ApiResponse(channelStats, "Channel stats fetched successfully"));
+    .json(new ApiResponse(channelStats, "Channel stats fetched successfully",200));
 });
 
 const getChannelVideos = asyncHandler(async (req, res) => {
