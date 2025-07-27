@@ -1,2 +1,2 @@
-#backend
-hello there I am making a structure of profetional data modeling in project
+# VideoArea
+A backend project for post videos with thumbnail and post tweets. User can Comment and like to video and tweets .
