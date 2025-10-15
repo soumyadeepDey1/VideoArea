@@ -1,7 +1,7 @@
 {
   "name": "video-area",
   "version": "1.0.0",
-  "description": "It is a profesional approch of data modeling of a project",
+  "description": "It is a video watching platform.Your can like and comment for every video. And you can tweet any post.",
   "type": "module",
   "main": "index.js",
   "scripts": {
