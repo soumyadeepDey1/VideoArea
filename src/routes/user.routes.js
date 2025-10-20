@@ -10,6 +10,9 @@ import {
   updateUserCover,
   getUserChanelProfile,
   getWatchHistory,
+  sendOTP,
+  verifyOTP,
+  forgotPassword
 } from "../controllers/user.controller.js";
 const router = Router();
 import { verifyJWT } from "../middlewares/auth.middleware.js";
@@ -51,4 +54,11 @@ router
 router.route("/c/:username").get(verifyJWT, getUserChanelProfile);
 
 router.route("/history").get(verifyJWT, getWatchHistory);
+
+router.route("/send-otp").post(sendOTP);
+
+router.route("/verify-otp").post(verifyOTP);
+
+router.route("/forgotpassword").post(forgotPassword);
+
 export default router;

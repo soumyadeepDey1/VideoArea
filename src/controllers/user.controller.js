@@ -3,8 +3,10 @@ import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
+import { sendMail } from "../utils/nodemailer.js";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
+import bcrypt from "bcrypt";
 import e from "express";
 
 const genarateAccessAndRefreshToken = async (userId) => {
@@ -336,125 +338,232 @@ const updateUserCover = asyncHandler(async (req, res) => {
     .json(new ApiResponse("User cover updated successfully", user, 200));
 });
 
-const getUserChanelProfile= asyncHandler(async(req,res) =>{
-  const {username}=req.params
-  if(!username?.trim()){
-    throw new ApiError("Username is missing",400)
+const getUserChanelProfile = asyncHandler(async (req, res) => {
+  const { username } = req.params;
+  if (!username?.trim()) {
+    throw new ApiError("Username is missing", 400);
   }
 
   const chanel = await User.aggregate([
     {
-      $match:{
-        username:username?.toLowerCase()
-      }
+      $match: {
+        username: username?.toLowerCase(),
+      },
     },
     {
-      $lookup:{
-        from:"Subscription",
-        localField:"_id",
-        foreignField:"channel",
-        as:"subscribers"
-      }
+      $lookup: {
+        from: "Subscription",
+        localField: "_id",
+        foreignField: "channel",
+        as: "subscribers",
+      },
     },
     {
-      $lookup:{
-        from:"Subscription",
-        localField:"_id",
-        foreignField:"subscriber",
-        as:"subscriptions"
-      }
+      $lookup: {
+        from: "Subscription",
+        localField: "_id",
+        foreignField: "subscriber",
+        as: "subscriptions",
+      },
     },
     {
-      $addFields:{
-        subscribersCount:{
-          $size:"$subscribers"
+      $addFields: {
+        subscribersCount: {
+          $size: "$subscribers",
         },
-        chanelSubscriptionsCount:{
-          $size:"$subscriptions"
-
+        chanelSubscriptionsCount: {
+          $size: "$subscriptions",
         },
-        isSubscribed:{
-          $cond:{
-            if:{
-              $in:[req.user?._id,"$subscribers.subscriber"]
+        isSubscribed: {
+          $cond: {
+            if: {
+              $in: [req.user?._id, "$subscribers.subscriber"],
             },
-            then:true,
-            else:false
-          }
-        }
-      }
+            then: true,
+            else: false,
+          },
+        },
+      },
     },
     {
-      $project:{
-        fullName:1,
-        username:1,
-        avatar:1,
-        cover:1,
-        subscribersCount:1,
-        chanelSubscriptionsCount:1, 
-        isSubscribed:1,
-        email:1,
-      }
-    }
-  ])
+      $project: {
+        fullName: 1,
+        username: 1,
+        avatar: 1,
+        cover: 1,
+        subscribersCount: 1,
+        chanelSubscriptionsCount: 1,
+        isSubscribed: 1,
+        email: 1,
+      },
+    },
+  ]);
 
   if (!chanel?.length) {
     throw new ApiError("Chanel not found", 404);
   }
   return res
     .status(200)
-    .json(new ApiResponse("Chanel profile fetched successfully", chanel[0], 200));
-})
+    .json(
+      new ApiResponse("Chanel profile fetched successfully", chanel[0], 200)
+    );
+});
 
 const getWatchHistory = asyncHandler(async (req, res) => {
   const user = await User.aggregate([
     {
-      $match:{
-        _id: new mongoose.Types.ObjectId(req.user._id)
-      }
+      $match: {
+        _id: new mongoose.Types.ObjectId(req.user._id),
+      },
     },
     {
-      $lookup:{
-        from:"videos",
-        localField:"watchHistory",
-        foreignField:"_id",
-        as:"watchHistory",
-        pipeline:[
+      $lookup: {
+        from: "videos",
+        localField: "watchHistory",
+        foreignField: "_id",
+        as: "watchHistory",
+        pipeline: [
           {
-            $lookup:{
-              from:"users",
-              localField:"owner",
-              foreignField:"_id",
-              as:"owner",
-              pipeline:[
+            $lookup: {
+              from: "users",
+              localField: "owner",
+              foreignField: "_id",
+              as: "owner",
+              pipeline: [
                 {
-                  $project:{
-                    fullName:1,
-                    username:1,
-                    avatar:1
-                  }
-                }
-              ]
-            }
+                  $project: {
+                    fullName: 1,
+                    username: 1,
+                    avatar: 1,
+                  },
+                },
+              ],
+            },
           },
           {
-            $addFields:{
-              owner:{
-                $first:"$owner"
-              }
-            }
-          }
-        ]
-      }
-    }
-  ])
-         console.log(user[0].watchHistory);
+            $addFields: {
+              owner: {
+                $first: "$owner",
+              },
+            },
+          },
+        ],
+      },
+    },
+  ]);
+  console.log(user[0].watchHistory);
 
   return res
     .status(200)
-    .json(new ApiResponse(200,user[0].watchHistory,"Watch history fetched successfully",));
+    .json(
+      new ApiResponse(
+        200,
+        user[0].watchHistory,
+        "Watch history fetched successfully"
+      )
+    );
 });
 
+const generateOTP = () => {
+  // Generate a 6-digit OTP
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+const sendOTP = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  if (!email) throw new ApiError("Email is required",400 );
+
+  const user = await User.findOne({ email });
+  if (!user) throw new ApiError( "User not found",404);
+
+  const otp = generateOTP();
+  const hashedOTP = await bcrypt.hash(otp, 10);
+  await User.findByIdAndUpdate(
+    user._id,
+    {
+      $set: {
+        otp: hashedOTP,
+        otpExpiry: new Date(Date.now() + 10 * 60 * 1000), // 10 min
+      },
+    },
+    { new: true }
+  );
+
+  const subject = "Your OTP Verification Code";
+  const text = `Hi ${user.fullName},\n\nYour OTP is: ${otp}\nIt is valid for 10 minutes.\nIf you didn’t request this, please ignore this email.`;
+  const html = `
+    <h3>Hi ${user.fullName}</h3>
+    <p>Your OTP is: <b>${otp}</b></p>
+    <p>It is valid for 10 minutes.</p>
+    <p>If you didn't request this OTP, please ignore this email.</p>
+  `;
+
+  await sendMail({ to: email, subject, text, html });
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      "OTP sent successfully",
+      {
+        message: "OTP has been sent to your email",
+      },
+      otp
+    )
+  );
+});
+
+const verifyOTP = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+  if (!email || !otp) throw new ApiError("Email and OTP are required",400 );
+  const user = await User.findOne({ email });
+  if (!user) throw new ApiError( "User not found",404);
+  if (!user.otp || !user.otpExpiry) {
+    throw new ApiError("No OTP found for this user",400);
+  }
+  if (user.otpExpiry < new Date()) {
+    throw new ApiError("OTP has expired",400);
+  }
+  const isMatch = await bcrypt.compare(otp, user.otp);
+  if (!isMatch) throw new ApiError("Invalid OTP",400);
+  user.isVerified = true;
+  user.otp = undefined;
+  user.otpExpiry = undefined;
+  await user.save();
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "OTP verifieed successfully"));
+});
+const forgotPassword = asyncHandler(async (req, res) => {
+  const { email, newPassword } = req.body;
+  if (!email || !newPassword) {
+    throw new ApiError( "Email and new password are required",400);
+  }
+  const user = await User.findOne({ email });
+  if (!user) throw new ApiError("User not found",404);
+  if (!user.isVerified) {
+    throw new ApiError(
+      
+      "OTP verification required before changing password",404
+    );
+  }
+  const isPasswordCorrect = await user.isPasswordCorrect(newPassword);
+  if (isPasswordCorrect) {
+    throw new ApiError(
+      
+      "New password should be different from old password",400
+    );
+  }
+  user.password = newPassword;
+  user.otp = undefined;
+  user.otpExpiry = undefined;
+  user.isVerified = false;
+
+  await user.save({ validateBeforeSave: false });
+  res
+    .status(200)
+    .json(new ApiResponse(200, "Password changed successfully", null));
+});
 export {
   registerUser,
   loginUser,
@@ -467,4 +576,7 @@ export {
   updateUserCover,
   getUserChanelProfile,
   getWatchHistory,
+  sendOTP,
+  verifyOTP,
+  forgotPassword
 };
